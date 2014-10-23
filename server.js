@@ -1,135 +1,97 @@
 var express = require('express');
 var app = express();
 var http = require('http').Server(app);
-var bodyParser = require('body-parser');
 var io = require('socket.io')(http);
+var bodyParser = require('body-parser');
 var port = process.env.PORT || 3000;
+var db = require('./db')
+var fs = require('fs');
+
+//add promisify
+// var Promise = require('bluebird');
+// var getPrompt = Promise.promisify(db.getPrompt);
+// var saveScore = Promise.promisify(db.saveScore);
+// var findScore = Promise.promisify(db.findScore);
+
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static(__dirname + '/client'));
 
+//****** database responses**********************************/
 
-// globals
-var users = {
-  userCount: 0,
-  socketList: [],
-  userNames: [],
-  userRooms: []
-}
+//on get requests for the prompt
+app.get('/prompt', function(req, res){
+   
+//get prompt by ID#? we can count prompts in DB and gen a random number 
+  //util.randomPromptByIndex()
+//or we can speficify prompt name in request
+
+   db.getPrompt(req.promptname, function(err, results){
+     
+     //factor to own file
+     var util = {};
+     //lookup filepath stored in db
+     util.loadfile = function(path){
+       fs.readFile(path, function(err, data){
+        if (error) throw err;
+        return data
+       })
+     }
+
+     //grab prompt and test
+     util.loadFile(results.promptpath)
+     util.loadFile(results.testpath)
+   
+   });
+
+
+});
+
+app.post('/score', function(req, res){
+  db.saveScore(req)
+
+});
+
+app.get('/highscores', function(req, res){
+  db.findScores();
+});
+
+//********** database actions above *********************************/
 
 io.on('connection', function(socket){
-
-  // individual user
-  var userId = socket.id;
-
-  // add user to count
-  users.userCount++;
-  console.log("");
-  console.log("Socket", userId, "connected");
+  console.log('a user connected');
 
 
-// ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~
-
-
-  // add to room
-  socket.on('addToRoom', function(username, room){
-
-    // variable used to determine number of users in a room
-    var roomLen = io.sockets.adapter.rooms[room];
-
-    // if room isn't full, add the user and update the users object
-    var addUser =  function(){
-      users.socketList.push(userId);
-      users.userNames.push(username);
-      users.userRooms.push([userId, username, room]);
-      socket.join(room);
-
-      console.log(username ,"(",userId,")", "added to", room);
-      io.sockets.in(room).emit('joinedRoom', username, room);
-    };
-
-    // when room has a total of 2 people, send prompt to that specific room
-    var providePrompt = function(specificRoom){
-
-      // this logic just grabs a random prompt
-      var prompts = ["Hello, solve this problem", "Solve this one", "Solve this other one too", "Waa waa waaaaaa", "Prompty Prompt", "abcdefg", "hijklmnop", "phhbbbbbbb"];
-      var prompt = prompts[Math.floor(Math.random() * prompts.length)];
-
-      // sends the prompt to a single room (the one pinging providePrompt)
-      io.sockets.in(specificRoom).emit('displayPrompt', prompt);
-    };
-
-    // user one, room doesn't exist
-    if(!roomLen){
-      addUser();
-
-    // second user to a single room  
-    } else if (Object.keys(roomLen).length < 2 && users.socketList.indexOf(userId) === -1){
-      addUser();
-      providePrompt(room);
-    }
-
+  socket.on('addToRoom', function(room){
+    socket.join(room)
+    console.log("JOINED ROOM:", room)
   });
 
-
-// ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~
-
   //helper fuction checks if room is full
-  socket.on('checkroom', function(specificRoom){
-    var roomLen = io.sockets.adapter.rooms[specificRoom];
+  socket.on('checkroom', function(room){
+
+    var roomLen = io.sockets.adapter.rooms[room];
     var isFull;
 
     if(!roomLen){
       isFull = false;
     } else {
-      isFull = Object.keys(roomLen).length >= 2 ? true : false;
+      isFull = Object.keys(roomLen).length >=2 ? true : false;
     }
 
-    console.log("Fullness status of", specificRoom, ":", isFull);
-    io.emit('roomStatus', isFull);
+  io.emit('roomStatus', isFull);
 
-  });
+ });
 
-  // ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~
-
-  // socket.on('scoreSent', function(score){
-  //   console.log("Score received:", score);
-  // });
-
-  // ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~  ***  ~~~~~~~~~~~~~
-
-  // detects when socket disconnects and cleans up users obj
   socket.on('disconnect', function(){
-    console.log("");
-    console.log("Socket", userId, "disconnected");
-
-    for(var i = 0; i < users.userRooms.length; i++){
-      if(users.userRooms[i][0] === userId){
-
-        // destroy "room" session for all users
-        var currentRoom = users.userRooms[i][2];
-        io.sockets.in(currentRoom).emit('destroyPrompt');
-
-        // remove user/room from object
-        users.userRooms.splice([i], 1);
-        break;
-      }
-    }
-
-    for(var i = 0; i < users.socketList.length; i++){
-      if(users.socketList[i] === userId){
-        users.socketList.splice([i], 1);
-        users.userNames.splice([i], 1);
-        break;
-      }
-    }
-
-    users.userCount--;
-    console.log("Remaining activity:");
-    console.log(users);
+    delete io.sockets.adapter.rooms[socket.id]
+    console.log('user disconnected');
   });
+
 });
+
+
 
 http.listen(port, function(){
   console.log('listening on port:', port);
