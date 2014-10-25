@@ -6,6 +6,7 @@ var http = require('http').Server(app);
 var bodyParser = require('body-parser');
 var io = require('socket.io')(http);
 var port = process.env.PORT || 3000;
+var db = require('./db');
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));
@@ -130,6 +131,14 @@ io.on('connection', function(socket){
     result.push(eval(code));
     var score = Math.floor(Math.random() * 10) + 1;  
       
+           var testScore = {
+            session: 35,
+            winner: "jim32my",
+            opponent: "chop324corn",
+            score: 13,
+            promptName: "fiib",
+            submittedcode: "function(x){return x+2}"
+           }
 
       // wait for eval to return...
         setTimeout(function(){
@@ -138,6 +147,11 @@ io.on('connection', function(socket){
           
           codeScore.result = result.toString();
           codeScore.score = score;
+
+          db.saveScore(testScore, function(err, res){
+            console.log('saaaaving ***score', err, res)
+
+          });
 
           // look at the user obj to figure out where we are currently
           for(var i = 0; i < users.userRooms.length; i++){
@@ -148,6 +162,7 @@ io.on('connection', function(socket){
               break;
             }
           }
+          
 
           io.sockets.in(userId).emit('sendScore', codeScore);
 

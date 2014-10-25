@@ -49,6 +49,7 @@ angular.module('app')
       console.log(codeScore, "CODE SCORE");
       var codeResult = codeScore.result;
       $scope.score = codeScore.score;
+      $scope.stopTimer()
       editor.setValue('// Your code resulted in: ' + codeResult + ' ||  Your score is: ' + $scope.score);
      });
 
@@ -56,9 +57,11 @@ angular.module('app')
       console.log("is Winner??", isWinner);
       setTimeout(function(){
         if(isWinner){
-          editor.setValue('YOU HAVE WON! Your score is ' + $scope.score);
+          document.getElementById('editor').style.fontSize='24px';
+          editor.setValue('\n\n\nYOU HAVE WON! Your score is ' + $scope.score +"\n\n\n");
         } else {
-          editor.setValue('YOU HAVE LOST! Your score is ' + $scope.score);
+          document.getElementById('editor').style.fontSize='24px';
+          editor.setValue('\n\n\nYOU HAVE LOST! Your score is ' + $scope.score+"\n\n\n");
         }
       }, 1000);
      });
